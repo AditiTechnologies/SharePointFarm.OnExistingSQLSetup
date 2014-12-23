@@ -1,0 +1,691 @@
+{
+    "Name": "SharePointFarm.OnExistingSQLSetup",
+    "Description": "Creates a highly available SharePoint farm deployment. It requires the presence of active directory infrastructure and SQL Server availability group.",
+    "Version": "1.0.0",
+    "Parameters": [
+        {
+            "Name": "Region",
+            "Type": "String",
+            "TypeHint": "AzureRegionName",
+            "Description": "Azure region to which the infrastructure will be deployed."
+        },
+        {
+            "Name": "AffinityGroup",
+            "Type": "String",
+            "TypeHint": "AzureAffinityGroupName",
+            "Description": "Azure affinity group to which the infrastructure will be deployed."
+        },
+		{
+            "Name": "VnetName",
+            "Type": "String",
+            "Description": "Name of Azure Virtual Network to be used for setting up SQL Availability Group. This should already exist."
+        },
+        {
+            "Name": "VnetAddressSpace",
+            "Type": "String",
+            "Description": "Address space of Azure Virtual Network to be used for setting up SharePoint farm.",
+            "Default": "10.0.0.0/8"
+        },
+		{
+            "Name": "SharePointSubnetName",
+            "Type": "String",
+            "Description": "Name of subnet within which SharePoint farm VMs will be created.",
+            "Default": "app-cluster"
+        },
+        {
+            "Name": "SharePointSubnetAddressSpace",
+            "Type": "String",
+            "Description": "Address space of subnet within which SharePoint farm VMs will be created.",
+            "Default": "10.20.3.0/24"
+        },
+        {
+            "Name": "DiskStore",
+            "Type": "String",
+            "TypeHint": "AzureStorageName",
+            "Description": "Name of Azure storage account for creating VM disks."
+        },
+		{
+            "Name": "FQDN",
+            "Type": "String",
+            "TypeHint": "domain",
+            "Description": "Fully qualified name of the domain configured in the specified Azure Virtual Network.",
+            "Minimum": 1,
+            "Maximum": 64
+        },
+        {
+            "Name": "Domain",
+            "Type": "String",
+            "TypeHint": "domain",
+            "Description": "NetBios name of the domain configured in the specified Azure Virtual Network.",
+            "Minimum": 1,
+            "Maximum": 64
+        },
+        {
+            "Name": "CloudService",
+            "Type": "String",
+            "TypeHint": "AzureCloudServiceName",
+            "Description": "Name of the SharePoint farm Azure Cloud Service."
+        },
+        {
+            "Name": "AppServerCount",
+            "Type": "Number",
+            "Description": "No of SharePoint App servers to be deployed.",
+            "Default": 2,
+            "Minimum": 1,
+            "Maximum": 3
+        },
+        {
+            "Name": "WebServerCount",
+            "Type": "Number",
+            "Description": "No of SharePoint web servers to be deployed.",
+            "Default": 2,
+            "Minimum": 1,
+            "Maximum": 3
+        },
+        {
+            "Name": "VMSize",
+            "Type": "String",
+            "TypeHint": "AzureRoleSize",
+            "Description": "Size of the SharePoint farm VMs.",
+            "Default": "Large"
+        },
+        {
+            "Name": "AdminName",
+            "Type": "String",
+            "TypeHint": "username",
+            "Description": "Name of local administrator account.",
+            "Minimum": 1,
+            "Maximum": 64
+        },
+        {
+            "Name": "AdminPassword",
+            "Type": "String",
+            "TypeHint": "password",
+            "Description": "Password of local administrator account.",
+            "MaskValue": true,
+            "AllowedRegex": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$@$!%*#?&])[A-Za-z\\d$@$!%*#?&]{8,}$",
+			"AllowedDescription": "Please provide a complex password comprised of minimum 8 characters with atleast 1 alphabet, 1 number and 1 special character."
+        },
+        {
+            "Name": "DomainJoinUserName",
+            "Type": "String",
+            "TypeHint": "username",
+            "Description": "Domain user account which is to be used for joining the SQL Availability Group VMs to domain. This user account must be a member of the group 'Domain Admins'.",
+            "Minimum": 1,
+            "Maximum": 64
+        },
+        {
+            "Name": "DomainJoinUserPassword",
+            "Type": "String",
+            "TypeHint": "password",
+            "Description": "Password of user account which is to be used for joining the SQL Availability Group VMs to domain.",
+            "MaskValue": true,
+            "Minimum": 8,
+            "Maximum": 127
+        },
+		{
+            "Name": "AvailabilityGroupName",
+            "Type": "String",
+            "Description": "Name of SQL Server Availability Group to which SharePoint databases will be joined to.",
+            "Minimum": 1,
+            "Maximum": 32
+        },
+		{
+            "Name": "AvailabilityGroupListenerName",
+            "Type": "String",
+            "Description": "SQL Server Availability Group listener name. (To be used for connecting with sql availability group)",
+            "Maximum": 32,
+			"Default": ""
+        },
+        {
+            "Name": "SqlAdminPassword",
+            "Type": "String",
+            "TypeHint": "password",
+            "Description": "Password for SQL sa account.",
+			"MaskValue": true,
+            "AllowedRegex": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$@$!%*#?&])[A-Za-z\\d$@$!%*#?&]{8,}$",
+			"AllowedDescription": "Please provide a complex password comprised of minimum 8 characters with atleast 1 alphabet, 1 number and 1 special character."
+        }, 
+		{
+            "Name": "NumberOfSQLNodes",
+            "Type": "Number",
+            "Description": "No of SQL nodes.",
+            "Default": 2,
+            "Minimum": 2,
+            "Maximum": 5
+        },
+        {
+            "Name": "FarmAdminName",
+            "Type": "String",
+            "TypeHint": "username",
+            "Description": "Name of sharepoint farm administrator account.",
+            "Minimum": 1,
+            "Maximum": 64
+        },
+        {
+            "Name": "FarmAdminPassword",
+            "Type": "String",
+            "TypeHint": "password",
+            "Description": "Password of sharepoint farm administrator account.",
+            "MaskValue": true,
+            "AllowedRegex": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$@$!%*#?&])[A-Za-z\\d$@$!%*#?&]{8,}$",
+			"AllowedDescription": "Please provide a complex password comprised of minimum 8 characters with atleast 1 alphabet, 1 number and 1 special character."
+        },
+        {
+            "Name": "FarmPassphrase",
+            "Type": "String",
+            "TypeHint": "password",
+            "Description": "Safemode Password for sharepoint farm",
+            "MaskValue": true,
+            "AllowedRegex": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[$@$!%*#?&])[A-Za-z\\d$@$!%*#?&]{8,}$",
+			"AllowedDescription": "Please provide a complex password comprised of minimum 8 characters with atleast 1 alphabet, 1 number and 1 special character."
+        }
+		{% if AvailabilityGroupListenerName == null %}
+			{% assign AvailabilityGroupListenerName = AvailabilityGroupName | append: 'Listener' %}
+		{% endif %}
+    ],
+    "Network": {
+        "DnsServers": [
+            {
+                "Name": "ad-dns1",
+                "IPAddress": "10.0.0.4"
+            },
+            {
+                "Name": "ad-dns2",
+                "IPAddress": "10.0.0.5"
+            }
+        ],
+        "LocalSites": [],
+        "VirtualSites": [
+            {
+                "Name": "{{VnetName}}",
+                "AffinityGroup": "{{AffinityGroup}}",
+                "AddressSpace": [
+                    "{{VnetAddressSpace}}"
+                ],
+                "Subnets": [
+                    {
+                        "Name": "{{SharePointSubnetName}}",
+                        "AddressPrefix": "{{SharePointSubnetAddressSpace}}"
+                    }
+                ]
+            }
+        ]
+    },
+    "AffinityGroup": {
+        "Name": "{{AffinityGroup}}",
+        "Region": "{{Region}}",
+        "Label": "Created by Brewmaster"
+    },
+    "StorageAccounts": [
+        {
+            "Name": "{{DiskStore}}",
+            "AffinityGroup": "{{AffinityGroup}}",
+            "Region": "{{Region}}",
+            "Description": "A non-georedundant disk store",
+            "DisableGeoReplication": true
+        }
+    ],
+    "CloudServices": [               
+        {
+            "Name": "{{CloudService}}",
+            "AffinityGroup": "{{AffinityGroup}}",
+            "Region": "{{Region}}",
+            "Description": "SharePoint farm deployment.",
+            "Deployment": {
+                "VirtualNetwork": "{{VnetName}}",
+                "VirtualMachines": [
+                    {
+                        "Name": "spapp1",
+                        "RoleSize": "{{VMSize}}",
+                        "Subnets": [
+                            "{{SharePointSubnetName}}"
+                        ],
+                        "AvailabilitySet": "sharepoint-avs",
+                        "OsVirtualDisk": {
+                            "OsType": "Windows",
+                            "OsImageName": "c6e0f177abd8496e934234bd27f46c5d__SharePoint*"
+                        },
+                        "DataVirtualDisks": [
+                            {
+                                "DiskId": "disk0",
+                                "Lun": 0,
+                                "LogicalSizeInGB": 40
+                            }
+                        ],
+                        "WindowsConfigSet": {
+                            "LocalAdminCredentialId": "DomainAdmin:local",
+                            "EnableAutomaticUpdates": false,
+                            "ChangePasswordAtLogon": false,
+                            "DisableRdp": false,
+                            "DomainJoinSettings": {
+                                "DomainToJoin": "{{FQDN}}",
+                                "CredentialId": "DomainJoinCred"
+                            }
+                        },
+                        "ConfigSets": [
+                            "SharepointAppServerAdminNode",
+							"SharepointAppServerNode"
+                        ]
+                    }
+{% for i in (2..AppServerCount) -%}
+                    ,{
+                        "Name": "spapp{{i}}",
+                        "RoleSize": "{{VMSize}}",
+                        "Subnets": [
+                            "{{SharePointSubnetName}}"
+                        ],
+                        "AvailabilitySet": "spapp-avs",
+                        "OsVirtualDisk": {
+                            "OsType": "Windows",
+                            "OsImageName": "c6e0f177abd8496e934234bd27f46c5d__SharePoint*"
+                        },
+                        "DataVirtualDisks": [
+                            {
+                                "DiskId": "disk0",
+                                "Lun": 0,
+                                "LogicalSizeInGB": 40
+                            }
+                        ],
+                        "WindowsConfigSet": {
+                            "LocalAdminCredentialId": "DomainAdmin:local",
+                            "EnableAutomaticUpdates": false,
+                            "ChangePasswordAtLogon": false,
+                            "DisableRdp": false,
+                            "DomainJoinSettings": {
+                                "DomainToJoin": "{{FQDN}}",
+                                "CredentialId": "DomainJoinCred"
+                            }
+                        },
+                        "ConfigSets": [
+                            "SharepointAppServerNode"
+                        ]
+                    }
+{% endfor -%}
+                    ,{
+                        "Name": "spweb1",
+                        "RoleSize": "{{VMSize}}",
+                        "Subnets": [
+                            "{{SharePointSubnetName}}"
+                        ],
+                        "AvailabilitySet": "spweb-avs",
+                        "OsVirtualDisk": {
+                            "OsType": "Windows",
+                            "OsImageName": "c6e0f177abd8496e934234bd27f46c5d__SharePoint*"
+                        },
+                        "DataVirtualDisks": [
+                            {
+                                "DiskId": "disk0",
+                                "Lun": 0,
+                                "LogicalSizeInGB": 40
+                            }
+                        ],
+                        "WindowsConfigSet": {
+                            "LocalAdminCredentialId": "DomainAdmin:local",
+                            "EnableAutomaticUpdates": false,
+                            "ChangePasswordAtLogon": false,
+                            "DisableRdp": false,
+                            "DomainJoinSettings": {
+                                "DomainToJoin": "{{FQDN}}",
+                                "CredentialId": "DomainJoinCred"
+                            }
+                        },
+                        "ConfigSets": [
+                            "SharepointWebServerNode"
+                        ]
+                    }
+{% for i in (2..WebServerCount) -%}
+                    ,{
+                        "Name": "spweb{{i}}",
+                        "RoleSize": "{{VMSize}}",
+                        "Subnets": [
+                            "{{SharePointSubnetName}}"
+                        ],
+                        "AvailabilitySet": "sharepoint-avs",
+                        "OsVirtualDisk": {
+                            "OsType": "Windows",
+                            "OsImageName": "c6e0f177abd8496e934234bd27f46c5d__SharePoint*"
+                        },
+                        "DataVirtualDisks": [
+                            {
+                                "DiskId": "disk0",
+                                "Lun": 0,
+                                "LogicalSizeInGB": 40
+                            }
+                        ],
+                        "WindowsConfigSet": {
+                            "LocalAdminCredentialId": "DomainAdmin:local",
+                            "EnableAutomaticUpdates": false,
+                            "ChangePasswordAtLogon": false,
+                            "DisableRdp": false,
+                            "DomainJoinSettings": {
+                                "DomainToJoin": "{{FQDN}}",
+                                "CredentialId": "DomainJoinCred"
+                            }
+                        },
+                        "ConfigSets": [
+                            "SharepointWebServerNode"
+                        ]
+                    }
+{% endfor -%}
+                ],
+                "DiskStorageAccount": "{{DiskStore}}"
+            }
+        }
+    ],   
+    "Credentials": [
+        {
+            "Name": "DomainAdmin:local",
+            "UserName": "{{AdminName}}",
+            "Password": "{{AdminPassword}}"
+        },
+        {
+            "Name": "DomainJoinCred",
+            "UserName": "{{Domain}}\\{{DomainJoinUserName}}",
+            "Password": "{{DomainJoinUserPassword}}"
+        }
+    ],
+    "ConfigSets": [               
+        {
+            "Name": "SharepointAppServerAdminNode",
+            "Description": "SharePoint App Server AdminSite VM.",
+            "Endpoints": [
+                {
+                    "Name": "AdminSite",
+                    "LocalPort": 20000,
+                    "Protocol": "tcp",
+                    "Port": 20000
+                }
+            ],
+            "ConfigurationIds": []
+        },
+		{
+            "Name": "SharepointAppServerNode",
+            "Description": "SharePoint App Server VM.",
+            "Endpoints": [],            
+            "ConfigurationIds": [
+                "SetupSharepointFarm"
+            ]
+        },
+        {
+            "Name": "SharepointWebServerNode",
+            "Description": "SharePoint Web Server VMs.",
+            "Endpoints": [
+                {
+                    "Name": "web",
+                    "LocalPort": 80,
+                    "Protocol": "tcp",
+                    "Port": 80,
+                    "LoadBalancerProbe": {
+                        "Name": "spweb-http",
+                        "Protocol": "http",
+                        "Port": 8080,
+                        "Path": "/"
+                    }
+                }
+            ],
+            "ConfigurationIds": [
+                "SetupSharepointFarm",
+                "ProvisionHighlyAvailableDefaultSite"
+            ]
+        }
+    ],
+    "Configurations": [        
+		{
+            "Name": "SetupSharepointFarm",
+            "Description": "SharePoint farm setup.",
+            "Resources": [
+                {
+                    "Type": "xFormatDisks",
+                    "ImportModule": "xAzureDataDisks",
+                    "ImportTypeName": "ADITI_xFormatDisks",
+                    "Name": "FormatRawDisks",
+                    "Args": {
+                        "FirstDriveLetter": "F"
+                    }
+                },
+                {
+                    "Type": "WindowsFeature",
+                    "ImportModule": null,
+                    "ImportTypeName": null,
+                    "Name": "RSATADPowershell",
+                    "Args": {
+                        "Name": "RSAT-AD-Powershell",
+                        "Ensure": "Present",
+                        "IncludeAllSubFeature": "true",
+                        "LogPath": "%BrewmasterDir%\\Logs\\Install-RSATADPowershell.log"
+                    }
+                },
+                {
+                    "Type": "xADUser",
+                    "ImportModule": "xActiveDirectory",
+                    "ImportTypeName": "MSFT_xADUser",
+                    "Name": "CreateSharepointFarmAdminDomainAccount",
+                    "Args": {
+                        "DomainName": "{{FQDN}}",
+                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)",
+                        "UserName": "{{FarmAdminName}}",
+                        "Password": "%%New-Object PSCredential '{{Domain}}\\{{FarmAdminName}}', (ConvertTo-SecureString '{{FarmAdminPassword}}' -AsPlainText -Force)",
+                        "Ensure": "Present"
+                    },
+                    "Requires": [
+                        "[WindowsFeature]RSATADPowershell"
+                    ]
+                },
+                {
+                    "Credential": "DomainAdmin:local",
+                    "Type": "Script",
+                    "ImportModule": null,
+                    "ImportTypeName": null,
+                    "Name": "AddSharepointFarmAdminToLocalAdminGroup",
+                    "GetScript": "@{ exists = (net localgroup administrators) -contains $acctname }",
+                    "SetScript": "$users = (net localgroup administrators)\r\nif ($users -notcontains $acctname)\r\n{\r\n\tWrite-Verbose \"Adding [$acctname] to local administators group.\"\r\n\tnet localgroup administrators $acctname /Add | Out-Null\r\n}",
+                    "TestScript": null,
+                    "Args": {
+                        "acctname": "{{Domain}}\\{{FarmAdminName}}"
+                    }
+                },
+                {
+                    "Type": "xSharePointAccounts",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xSharePointAccounts",
+                    "Name": "CreateSharepointAccounts",
+                    "Args": {
+                        "OuName": "SP_Accounts",
+                        "FarmAdminPassword": "{{FarmAdminPassword}}",
+                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spapp1"
+                    ],
+                    "Requires": [
+                        "[xADUser]CreateSharepointFarmAdminDomainAccount"
+                    ]
+                },
+                {
+                    "Type": "xSharePointFarm",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xSharePointFarm",
+                    "Name": "CreateSharepointFarm",
+                    "Args": {
+                        "FarmAdmin": "{{Domain}}\\{{FarmAdminName}}",
+                        "FarmAdminPassword": "{{FarmAdminPassword}}",
+                        "FarmPassPhrase": "{{FarmPassPhrase}}",
+                        "DbServer": "{{AvailabilityGroupListenerName}}",
+                        "ConfigurationDbName": "SP_Config",
+                        "CAContentDbName": "SP_Content_Admin",
+                        "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
+                    },
+					"Nodes": [
+                        "{{SharepointCloudService}}.spapp1"
+                    ],
+                    "Requires": [
+                        "[Script]AddSharepointFarmAdminToLocalAdminGroup"
+                    ]
+                },
+				{
+                    "Type": "xWaitAndJoinSharePointFarm",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xWaitAndJoinSharePointFarm",
+                    "Name": "JoinSharepointFarm",
+                    "Args": {
+                        "FarmAdmin": "{{Domain}}\\{{FarmAdminName}}",
+                        "FarmAdminPassword": "{{FarmAdminPassword}}",
+                        "FarmPassPhrase": "{{FarmPassPhrase}}",
+                        "DbServer": "{{AvailabilityGroupListenerName}}",
+                        "ConfigurationDbName": "SP_Config",
+                        "CAContentDbName": "SP_Content_Admin",
+                        "LogLocation": "F:\\Logs",
+                        "LogDiskSpaceUsageGB": "%%4",
+						"RetryIntervalSec": "%%180",
+                        "RetryCount": "%%15",
+                        "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
+                    },
+                    "Requires": [
+                        "[Script]AddSharepointFarmAdminToLocalAdminGroup"
+                    ]
+                },
+				{
+                    "Type": "xSharePointCentralAdmin",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xSharePointCentralAdmin",
+                    "Name": "ProvisionCentralAdmin",
+                    "Args": {
+                        "CAWebPort": "%%20000",
+                        "AltUrl": "http://{{SharepointCloudService}}.cloudapp.net:20000",
+                        "FarmAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{FarmAdminName}}', (ConvertTo-SecureString '{{FarmAdminPassword}}' -AsPlainText -Force)"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spapp1"
+                    ]
+                },
+				{
+                    "Type": "xSharePointManagedAccounts",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xSharePointManagedAccounts",
+                    "Name": "CreateManagedAccounts",
+                    "Args": {
+                        "FarmAdmin": "{{Domain}}\\{{FarmAdminName}}",
+                        "FarmAdminPassword": "{{FarmAdminPassword}}",
+                        "DomainName": "{{Domain}}"
+                    }
+                }
+            ]
+        },		
+        {
+            "Name": "ProvisionHighlyAvailableDefaultSite",
+            "Description": "Creates a blank site for quickly publishing web pages and enables high availability by adding the SharePoint DBs to SQL Server Availability Group.",
+            "Resources": [
+                {
+                    "Type": "xSharePointWebApplication",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xSharePointWebApplication",
+                    "Name": "CreateWebApplication",
+                    "Args": {
+                        "WebAppName": "PublishingSite",
+                        "AppPoolName": "WebApplication Pool",
+                        "AppPoolAccount": "{{Domain}}\\SP_WebAppPool",
+                        "SiteUrl": "http://{{SharepointCloudService}}.cloudapp.net",
+                        "Port": "%%80",
+                        "ProbePort": "%%8080",
+                        "SiteName": "Blank Publishing Site",
+                        "SiteTemplate": "BLANKINTERNET#0",
+                        "SiteOwner": "{{Domain}}\\{{FarmAdminName}}",
+                        "FarmAdministratorCredential": "%%New-Object PSCredential '{Domain}}\\{{FarmAdminName}}', (ConvertTo-SecureString '{{FarmAdminPassword}}' -AsPlainText -Force)",
+                        "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
+                    }
+                },
+				{
+                    "Type": "File",
+                    "ImportModule": null,
+                    "ImportTypeName": null,
+                    "Name": "CreateBackupFolder",
+                    "Args": {
+                        "DestinationPath": "F:\\backup",
+                        "Type": "Directory",
+                        "Ensure": "Present",
+                        "Force": "False"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spweb1"
+                    ]
+                },
+                {
+                    "Type": "xSmbShare",
+                    "ImportModule": "xSmbShare",
+                    "ImportTypeName": "MSFT_xSmbShare",
+                    "Name": "CreateBackupShare",
+                    "Args": {
+                        "Name": "backup",
+                        "Path": "F:\\backup",
+                        "FullAccess": "everyone",
+                        "Ensure": "Present",
+                        "Description": "SharePoint databases backup folder"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spweb1"
+                    ],
+                    "Requires": [
+                        "[File]CreateBackupFolder"
+                    ]
+                },
+				{
+					"Type": "Package",
+                    "ImportModule": null,
+                    "ImportTypeName": null,
+                    "Name": "SqlODBC",
+                    "Args": {
+                        "Path": "http://download.microsoft.com/download/5/7/2/57249A3A-19D6-4901-ACCE-80924ABEB267/1033/x64/msodbcsql.msi",
+                        "Name": "Microsoft ODBC Driver 11 for SQL Server",
+						"ProductId": "",
+						"Arguments":"IACCEPTMSODBCSQLLICENSETERMS=YES",
+                        "Ensure": "Present"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spweb1"
+                    ]
+				},
+				{
+					"Type": "Package",
+                    "ImportModule": null,
+                    "ImportTypeName": null,
+                    "Name": "SqlCmdTool",
+                    "Args": {
+                        "Path":"http://download.microsoft.com/download/5/5/B/55BEFD44-B899-4B54-ACD7-506E03142B34/1033/x64/MsSqlCmdLnUtils.msi",
+                        "Name": "Microsoft Command Line Utilities 11 for SQL Server",
+						"ProductId": "",
+						"Arguments": "IACCEPTMSSQLCMDLNUTILSLICENSETERMS=YES",
+                        "Ensure": "Present"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spweb1"
+                    ],
+                    "Requires": [
+                        "[Package]SqlODBC"
+                    ]
+				},               
+                {
+                    "Type": "xSharePointDatabasesHighAvailability",
+                    "ImportModule": "xAzureSharePointFarm",
+                    "ImportTypeName": "ADITI_xSharePointDatabasesHighAvailability",
+                    "Name": "MakeSharepointDatabasesHighlyAvailable",
+                    "Args": {
+                        "AvailabilityGroupName": "{{AvailabilityGroupName}}",
+                        "SQLNodeNamePrefix": "sql",
+                        "NumberOfSQLNodes": "{{NumberOfSQLNodes}}",
+                        "DatabaseBackupPath": "%%\"\\\\$env:COMPUTERNAME\\backup\"",
+                        "FarmAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{FarmAdminName}}', (ConvertTo-SecureString '{{FarmAdminPassword}}' -AsPlainText -Force)",
+                        "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
+                    },
+                    "Nodes": [
+                        "{{SharepointCloudService}}.spweb1"
+                    ],
+                    "Requires": [
+                        "[xSmbShare]CreateBackupShare",
+                        "[Package]SqlCmdTool"
+                    ]
+                }
+            ]
+        }
+    ]
+}
