@@ -236,7 +236,7 @@ select replica_server_name from sys.availability_replicas
 inner join sys.availability_groups on sys.availability_replicas.group_id = sys.availability_groups.group_id
 where sys.availability_groups.name = N'$agName'
 "@   
-    $result = (osql -S $agListenerName -U $sa -P $saPassword -Q $query -h-1)
+    $result = (sqlcmd -S $agListenerName -U $sa -P $saPassword -Q $query -h-1)
     $sqlNodes = @()
     foreach($val in $result)
     {
