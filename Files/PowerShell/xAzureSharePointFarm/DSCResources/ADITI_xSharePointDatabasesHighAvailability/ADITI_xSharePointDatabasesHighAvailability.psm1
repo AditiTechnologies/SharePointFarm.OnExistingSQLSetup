@@ -15,11 +15,7 @@ function Get-TargetResource
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $SQLNodeNamePrefix,
-
-        [parameter(Mandatory)]
-        [ValidateRange(2,5)]
-        [Uint32] $NumberOfSQLNodes,
+        [string] $AvailabilityGroupListenerName,
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -50,14 +46,10 @@ function Set-TargetResource
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string] $AvailabilityGroupName,
-        
-		[parameter(Mandatory)]
-        [ValidateNotNullOrEmpty()]
-        [string] $SQLNodeNamePrefix,
 
         [parameter(Mandatory)]
-        [ValidateRange(2,5)]
-        [Uint32] $NumberOfSQLNodes,        
+        [ValidateNotNullOrEmpty()]
+        [string] $AvailabilityGroupListenerName,
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -99,14 +91,13 @@ function Set-TargetResource
     $env:Path += ";$env:ProgramFiles\Microsoft SQL Server\Client SDK\ODBC\110\Tools\Binn"
     $sa = $SqlAdministratorCredential.UserName
     $saPassword = $SqlAdministratorCredential.GetNetworkCredential().Password    
-    
+    $dbServers = GetSqlNodes -agName $AvailabilityGroupName -agListenerName $AvailabilityGroupListenerName -sa $sa -saPassword $saPassword
+
     # restore database
     foreach($db in $databases.Name)
     {
-        for($index = 1; $index -le $NumberOfSQLNodes; $index++)
+        foreach($dbServer in $dbServers)
         {
-            $dbServer = "$SQLNodeNamePrefix$index"
-
             $role = [int] (sqlcmd -S $dbServer -U $sa -P $saPassword -Q "select role from sys.dm_hadr_availability_replica_states where is_local = 1" -h-1)[0]
             $dbExists = [bool] [int](sqlcmd -S $dbServer -U $sa -P $saPassword -Q "select count(*) from master.sys.databases where name = '$db'" -h-1)[0]
             $dbIsAddedToAg = [bool] [int](sqlcmd -S $dbServer -U $sa -P $saPassword -Q "select count(*) from sys.dm_hadr_database_replica_states inner join sys.databases on sys.databases.database_id = sys.dm_hadr_database_replica_states.database_id where sys.databases.name = '$db'" -h-1)[0]
@@ -168,11 +159,7 @@ function Test-TargetResource
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-        [string] $SQLNodeNamePrefix,
-
-        [parameter(Mandatory)]
-        [ValidateRange(2,5)]
-        [Uint32] $NumberOfSQLNodes,
+        [string] $AvailabilityGroupListenerName,
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -240,6 +227,26 @@ function CloseUserToken([IntPtr] $token)
     {
         throw "Can't close token"
     }
+}
+
+function GetSqlNodes($agName, $agListenerName, $sa, $saPassword)
+{
+    $query = @"
+select replica_server_name from sys.availability_replicas
+inner join sys.availability_groups on sys.availability_replicas.group_id = sys.availability_groups.group_id
+where sys.availability_groups.name = N'$agName'
+"@   
+    $result = (osql -S $agListenerName -U $sa -P $saPassword -Q $query -h-1)
+    $sqlNodes = @()
+    foreach($val in $result)
+    {
+        if([System.String]::IsNullOrEmpty($val) -or [System.String]::IsNullOrWhiteSpace($val) -or $val.EndsWith('rows affected)'))
+        {
+            continue;
+        }
+        $sqlNodes += @($val)
+    }
+    return $sqlNodes
 }
 
 Export-ModuleMember -Function *-TargetResource

@@ -670,9 +670,8 @@
                     "ImportTypeName": "ADITI_xSharePointDatabasesHighAvailability",
                     "Name": "MakeSharepointDatabasesHighlyAvailable",
                     "Args": {
+                        "AvailabilityGroupListenerName": "{{AvailabilityGroupListenerName}}",
                         "AvailabilityGroupName": "{{AvailabilityGroupName}}",
-                        "SQLNodeNamePrefix": "sql",
-                        "NumberOfSQLNodes": "{{NumberOfSQLNodes}}",
                         "DatabaseBackupPath": "%%\"\\\\$env:COMPUTERNAME\\backup\"",
                         "FarmAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{FarmAdminName}}', (ConvertTo-SecureString '{{FarmAdminPassword}}' -AsPlainText -Force)",
                         "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
